@@ -55,7 +55,7 @@ def assign_priorities(tasks: Sequence[Task], policy: str) -> list[Task]:
 
     return sorted(tasks, key=key)
 
-def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) -> float | None:
+def _compute_response_time(task: Task,higher_priority_tasks: Iterable[Task],blocking: float = 0.0,) -> float | None:
     """Calcule le pire temps de réponse pour ``task``.
 
     Parameters
@@ -64,6 +64,9 @@ def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) ->
         Tâche analysée.
     higher_priority_tasks:
         Tâches de priorité strictement supérieure à ``task``.
+
+    blocking:
+        Durée de blocage potentielle due aux tâches de priorité plus faible.
 
     Returns
     -------
@@ -76,7 +79,7 @@ def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) ->
             "Response-time analysis with HPF requires synchronous releases (offset=0)."
         )
 
-    response = task.computation_time
+    response = task.computation_time + blocking
     higher = list(higher_priority_tasks)
 
     for _ in range(1000):
@@ -84,7 +87,7 @@ def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) ->
         for hp_task in higher:
             interference += math.ceil(response / hp_task.period) * hp_task.computation_time
 
-        next_response = task.computation_time + interference
+        next_response = task.computation_time + blocking + interference
         if next_response > task.deadline + EPSILON:
             return None
 
@@ -96,7 +99,7 @@ def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) ->
     raise RuntimeError("Response-time analysis did not converge")
 
 
-def check_feasibility(tasks: Sequence[Task], policy: str = "HPF") -> bool:
+def check_feasibility(tasks: Sequence[Task], policy: str = "HPF", preemptive: bool = True) -> bool:
     """Vérifie la faisabilité d'un ensemble de tâches à priorités fixes.
 
     Parameters
@@ -106,6 +109,9 @@ def check_feasibility(tasks: Sequence[Task], policy: str = "HPF") -> bool:
 
     policy:
         Politique utilisée pour l'assignation des priorités.
+
+    preemptive:
+        ``True`` pour un modèle préemptif, ``False`` pour un modèle non préemptif.
 
     Returns
     -------
@@ -117,7 +123,13 @@ def check_feasibility(tasks: Sequence[Task], policy: str = "HPF") -> bool:
 
     for index, task in enumerate(ordered_tasks):
         higher = ordered_tasks[:index]
-        response = _compute_response_time(task, higher)
+        if preemptive:
+            blocking = 0.0
+        else:
+            lower = ordered_tasks[index + 1 :]
+            blocking = max((lp_task.computation_time for lp_task in lower), default=0.0)
+
+        response = _compute_response_time(task, higher, blocking=blocking)
         if response is None:
             return False
 

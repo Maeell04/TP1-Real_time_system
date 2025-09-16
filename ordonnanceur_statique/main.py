@@ -108,6 +108,20 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
             "Politique d'assignation des priorités : HPF (alias RM), RM ou DM."
         ),
     )
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument(
+        "--preemptive",
+        dest="preemptive",
+        action="store_true",
+        help="Analyse en supposant un ordonnanceur préemptif (par défaut).",
+    )
+    mode_group.add_argument(
+        "--non-preemptive",
+        dest="preemptive",
+        action="store_false",
+        help="Analyse en supposant un ordonnanceur non préemptif.",
+    )
+    parser.set_defaults(preemptive=True)
     return parser.parse_args(argv)
 
 
@@ -123,17 +137,19 @@ def main(argv: Sequence[str] | None = None) -> None:
 
     policy_label = args.policy.upper()
     describe_tasks(tasks, args.policy, args.time_unit)
+    mode_label = "préemptif" if args.preemptive else "non préemptif"
+    print(f"Mode d'ordonnancement analysé : {mode_label}.")
 
     try:
-        feasible = check_feasibility(list(tasks), policy=args.policy)
+        feasible = check_feasibility(list(tasks), policy=args.policy, preemptive=args.preemptive)
     except (ValueError, RuntimeError) as exc:
         print(f"Erreur lors de l'analyse : {exc}")
         raise SystemExit(1) from exc
 
     if feasible:
-        print(f"\nRésultat : l'ensemble de tâches est faisable avec la politique {policy_label}.")
+        print("\nRésultat : l'ensemble de tâches est faisable avec la politique "f"{policy_label} en mode {mode_label}.")
     else:
-        print(f"\nRésultat : l'ensemble de tâches n'est pas faisable avec la politique {policy_label}.")
+        print("\nRésultat : l'ensemble de tâches n'est pas faisable avec la politique "f"{policy_label} en mode {mode_label}.")
 
 
 if __name__ == "__main__":
