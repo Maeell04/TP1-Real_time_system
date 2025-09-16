@@ -2,9 +2,8 @@
 
 Ce module implémente la méthode d'analyse du temps de réponse pour vérifier
 la faisabilité d'un ensemble de tâches lorsque les priorités sont fixées selon
-une politique « Highest Priority First » (HPF). Les priorités sont ici
-attribuées sur la période des tâches : plus la période est courte, plus la
-priorité est élevée (ordonnancement de type Rate Monotonic).
+différentes politiques « Highest Priority First » (HPF/RM) ou « Deadline
+Monotonic » (DM).
 """
 
 from __future__ import annotations
@@ -15,11 +14,46 @@ from typing import Iterable, Sequence
 from ordonnanceur_edf.task import EPSILON, Task
 
 
-def _order_by_priority(tasks: Sequence[Task]) -> list[Task]:
-    """Retourne les tâches triées de la plus haute à la plus basse priorité."""
+def assign_priorities(tasks: Sequence[Task], policy: str) -> list[Task]:
+    """Retourne les tâches triées par ordre de priorité selon une politique donnée.
+    Parameters
+    ----------
+    tasks:
+        Tâches à ordonnancer.
+    policy:
+        Politique d'ordonnancement souhaitée. ``"RM"`` (Rate Monotonic) classe les
+        tâches par période croissante. ``"DM"`` (Deadline Monotonic) les classe par
+        échéance relative croissante. ``"HPF"`` est accepté comme alias de ``"RM"``.
 
-    return sorted(tasks, key=lambda task: (task.period, task.deadline, task.name))
+    Returns
+    -------
+    list[Task]
+        Nouvelle liste ordonnée de la plus haute à la plus basse priorité.
 
+    Raises
+    ------
+    ValueError
+        Si la politique n'est pas reconnue.
+    """
+
+    try:
+        normalized = policy.upper()
+    except AttributeError as exc:  # pragma: no cover - validation
+        raise TypeError("Policy must be provided as a string.") from exc
+
+    if normalized == "HPF":
+        normalized = "RM"
+
+    if normalized == "RM":
+        key = lambda task: (task.period, task.deadline, task.name)
+    elif normalized == "DM":
+        key = lambda task: (task.deadline, task.period, task.name)
+    else:  # pragma: no cover - validation
+        raise ValueError(
+            f"Unknown priority assignment policy: {policy}. Expected 'HPF', 'RM' or 'DM'."
+        )
+
+    return sorted(tasks, key=key)
 
 def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) -> float | None:
     """Calcule le pire temps de réponse pour ``task``.
@@ -62,13 +96,16 @@ def _compute_response_time(task: Task, higher_priority_tasks: Iterable[Task]) ->
     raise RuntimeError("Response-time analysis did not converge")
 
 
-def check_feasibility(tasks: list[Task]) -> bool:
-    """Vérifie la faisabilité d'un ensemble de tâches HPF via l'analyse du temps.
+def check_feasibility(tasks: Sequence[Task], policy: str = "HPF") -> bool:
+    """Vérifie la faisabilité d'un ensemble de tâches à priorités fixes.
 
     Parameters
     ----------
     tasks:
         Liste de tâches périodiques.
+
+    policy:
+        Politique utilisée pour l'assignation des priorités.
 
     Returns
     -------
@@ -76,7 +113,7 @@ def check_feasibility(tasks: list[Task]) -> bool:
         ``True`` si toutes les tâches respectent leurs échéances, ``False`` sinon.
     """
 
-    ordered_tasks = _order_by_priority(tasks)
+    ordered_tasks = assign_priorities(tasks, policy)
 
     for index, task in enumerate(ordered_tasks):
         higher = ordered_tasks[:index]
@@ -87,4 +124,4 @@ def check_feasibility(tasks: list[Task]) -> bool:
     return True
 
 
-__all__ = ["check_feasibility"]
+__all__ = ["assign_priorities", "check_feasibility"]

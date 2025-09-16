@@ -1,4 +1,4 @@
-"""Interface en ligne de commande pour l'analyse HPF des tâches périodiques."""
+"""Interface en ligne de commande pour l'analyse à priorités fixes des tâches."""
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(PACKAGE_ROOT.parent))
 
 from ordonnanceur_edf.task import Task
-from ordonnanceur_statique.hpf import check_feasibility
+from ordonnanceur_statique.hpf import assign_priorities, check_feasibility
 
 DEFAULT_TASKS = [
     {"name": "T1", "computation_time": 1, "period": 4, "deadline": 4},
@@ -57,7 +57,7 @@ def build_default_tasks() -> list[Task]:
     return [Task(**data) for data in DEFAULT_TASKS]
 
 
-def describe_tasks(tasks: Sequence[Task], unit: str) -> None:
+def describe_tasks(tasks: Sequence[Task], policy: str, unit: str) -> None:
     """Affiche un résumé des tâches et de leurs priorités."""
 
     if not tasks:
@@ -75,17 +75,20 @@ def describe_tasks(tasks: Sequence[Task], unit: str) -> None:
             f"U={task.utilization:.3f}"
         )
 
-    ordered = sorted(tasks, key=lambda t: (t.period, t.deadline, t.name))
+    ordered = assign_priorities(tasks, policy)
     priority_chain = " > ".join(task.name for task in ordered)
     print(f"Utilisation totale : {total_utilization:.3f}")
-    print("Priorités HPF (du plus élevé au plus faible) :", priority_chain)
-
+    print(f"Priorités {policy.upper()} (du plus élevé au plus faible) : {priority_chain}")
+    
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Analyse les arguments de la ligne de commande."""
 
     parser = argparse.ArgumentParser(
-        description="Vérifie la faisabilité d'un ensemble de tâches HPF (priorités fixes)."
+        description=(
+            "Vérifie la faisabilité d'un ensemble de tâches à priorités fixes "
+            "(HPF/RM/DM)."
+        ),
     )
     parser.add_argument(
         "--tasks",
@@ -97,11 +100,19 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
         default="s",
         help="Unité de temps affichée (par défaut : secondes).",
     )
+    parser.add_argument(
+        "--policy",
+        choices=["HPF", "RM", "DM"],
+        default="HPF",
+        help=(
+            "Politique d'assignation des priorités : HPF (alias RM), RM ou DM."
+        ),
+    )
     return parser.parse_args(argv)
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Point d'entrée du script HPF."""
+    """Point d'entrée du script d'analyse à priorités fixes."""
 
     args = parse_args(argv)
 
@@ -110,18 +121,19 @@ def main(argv: Sequence[str] | None = None) -> None:
     else:
         tasks = build_default_tasks()
 
-    describe_tasks(tasks, args.time_unit)
+    policy_label = args.policy.upper()
+    describe_tasks(tasks, args.policy, args.time_unit)
 
     try:
-        feasible = check_feasibility(list(tasks))
+        feasible = check_feasibility(list(tasks), policy=args.policy)
     except (ValueError, RuntimeError) as exc:
         print(f"Erreur lors de l'analyse : {exc}")
         raise SystemExit(1) from exc
 
     if feasible:
-        print("\nRésultat : l'ensemble de tâches est faisable par l'ordonnanceur HPF.")
+        print(f"\nRésultat : l'ensemble de tâches est faisable avec la politique {policy_label}.")
     else:
-        print("\nRésultat : l'ensemble de tâches n'est pas faisable par l'ordonnanceur HPF.")
+        print(f"\nRésultat : l'ensemble de tâches n'est pas faisable avec la politique {policy_label}.")
 
 
 if __name__ == "__main__":
