@@ -112,6 +112,9 @@ class Task:
             if release > limit + EPSILON:
                 break
 
+            if not include_job_at_horizon and abs(release - horizon) <= EPSILON:
+                break
+
             jobs.append(
                 Job(
                     task=self,

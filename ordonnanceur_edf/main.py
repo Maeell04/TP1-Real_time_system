@@ -103,7 +103,7 @@ def simulate_edf(tasks: Sequence[Task], horizon: float) -> dict[str, object]:
     ready_counter = itertools.count()
 
     for task in tasks:
-        for job in task.generate_jobs(horizon):
+        for job in task.generate_jobs(horizon, include_job_at_horizon=False):
             heapq.heappush(
                 future_jobs, (job.release_time, next(release_counter), job)
             )
@@ -113,8 +113,8 @@ def simulate_edf(tasks: Sequence[Task], horizon: float) -> dict[str, object]:
     missed_deadlines: List[Job] = []
     unfinished_jobs: List[Job] = []
 
-    while (future_jobs or ready_jobs) and now < horizon + EPSILON:
-        while future_jobs and future_jobs[0][0] <= now + EPSILON:
+    while (future_jobs or ready_jobs) and now < horizon:
+        while future_jobs and future_jobs[0][0] <= now:
             _, _, job = heapq.heappop(future_jobs)
             heapq.heappush(
                 ready_jobs,
@@ -160,7 +160,7 @@ def simulate_edf(tasks: Sequence[Task], horizon: float) -> dict[str, object]:
                 if job.deadline_missed:
                     missed_deadlines.append(job)
             else:
-                if now < horizon - EPSILON:
+                if now < horizon:
                     heapq.heappush(
                         ready_jobs,
                         (
@@ -174,7 +174,7 @@ def simulate_edf(tasks: Sequence[Task], horizon: float) -> dict[str, object]:
                     unfinished_jobs.append(job)
         else:
             if not future_jobs:
-                if now < horizon - EPSILON:
+                if now < horizon:
                     timeline.append(
                         TimelineEntry(
                             task="IDLE",
