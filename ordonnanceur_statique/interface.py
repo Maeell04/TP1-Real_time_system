@@ -121,7 +121,8 @@ def _collect_tasks() -> List[StaticTask]:
                 strictly_positive=True,
             )
             priority = _prompt_optional_int(
-                "  Priorité (entier, laisser vide si inconnu) : ", min_value=1
+                "  Priorité (entier, laisser vide si inconnu ; plus grand = plus prioritaire) : ",
+                min_value=1,
             )
 
             try:

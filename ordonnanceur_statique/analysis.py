@@ -47,7 +47,7 @@ def _order_tasks(tasks: Sequence[StaticTask], policy: str) -> List[StaticTask]:
         priorities = [task.priority for task in tasks if task.priority is not None]
         if len(set(priorities)) != len(priorities):
             raise ValueError("Les priorités HPF doivent être uniques")
-        ordered = sorted(tasks, key=lambda task: (task.priority, task.name))
+        ordered = sorted(tasks, key=lambda task: (-task.priority, task.name))
     elif policy_upper == "RM":
         ordered = sorted(tasks, key=lambda task: (task.period, task.deadline, task.name))
     elif policy_upper == "DM":

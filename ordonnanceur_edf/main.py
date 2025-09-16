@@ -103,10 +103,9 @@ def simulate_edf(tasks: Sequence[Task], horizon: float) -> dict[str, object]:
     ready_counter = itertools.count()
 
     for task in tasks:
-        for job in task.generate_jobs(horizon, include_job_at_horizon=False):
-            heapq.heappush(
-                future_jobs, (job.release_time, next(release_counter), job)
-            )
+        generated_jobs = task.generate_jobs(horizon, include_job_at_horizon=False)
+        for job in generated_jobs:
+            heapq.heappush(future_jobs, (job.release_time, next(release_counter), job))
 
     now = 0.0
     timeline: List[TimelineEntry] = []
@@ -267,7 +266,7 @@ def print_timeline(result: dict[str, object], unit: str) -> None:
 
     print("\nTrace EDF :")
     if not timeline:
-        print("  (aucun job exécuté dans l'horizon de simulation)")
+        print(f"  [0, {format_time(end_time)}] : processeur inactif")
     else:
         for entry in timeline:
             start = format_time(entry.start)
